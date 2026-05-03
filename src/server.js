@@ -5,6 +5,8 @@ import 'dotenv/config';
 import pino from 'pino-http';
 
 const app = express();
+const PORT = process.env.PORT ?? 3000;
+
 
 app.use(express.json());
 app.use(cors());
@@ -35,7 +37,7 @@ app.get('/notes', (req, res) => {
 
 app.get('/notes/:noteId', (req, res) => {
   const { noteId } = req.params;
-  res.status(200).json({ message: `Retrieved note with ID: ${noteId} ` });
+  res.status(200).json({ message: `Retrieved note with ID: ${noteId}` });
 });
 
 app.use((req, res) => {
@@ -47,11 +49,11 @@ app.use((err, req, res, next) => {
 
 
   res.status(500).json({
-    message: "<повідомлення про помилку>"
+    message: `Error 500`,
   });
 
 });
 
-app.listen(process.env.PORT, () => {
-  console.log(`Server is running on localhost:${process.env.PORT}`);
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
