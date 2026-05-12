@@ -5,7 +5,7 @@ import 'dotenv/config';
 import pino from 'pino-http';
 import { conectMongoDB } from './db/connectMongoDB.js';
 
-import { noteFoundHandler } from './middleware/noteFoundHandler.js';
+import { noteFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import notesRouters from './routes/notesRoutes.js'
 import { logger } from './middleware/logger.js';
