@@ -8,6 +8,7 @@ import { conectMongoDB } from './db/connectMongoDB.js';
 import { noteFoundHandler } from './middleware/noteFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import notesRouters from './routes/notesRoutes.js'
+import { logger } from './middleware/logger.js';
 const app = express();
 const PORT = process.env.PORT ?? 3000;
 
