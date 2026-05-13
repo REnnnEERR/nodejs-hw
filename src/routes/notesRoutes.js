@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { get } from "mongoose";
+
 import {
   getAllNotes,
   getNoteById,
@@ -9,6 +9,7 @@ import {
 } from "../controllers/notesController.js";
 
 const router = Router();
+
 
 router.get('/notes', getAllNotes);
 router.get('/notes/:noteId', getNoteById);

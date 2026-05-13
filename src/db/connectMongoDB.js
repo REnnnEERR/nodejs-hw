@@ -1,9 +1,9 @@
-import mongoose from 'mongoose'
+import mongoose from 'mongoose';
 
-export async function conectMongoDB() {
+export async function connectMongoDB() {
   try {
     const MongoUrl = process.env.MONGO_URI;
-    await mongoose.connect(MongoUrl)
+    await mongoose.connect(MongoUrl);
     console.log(' ✅ MongoDB connection established successfully');
   } catch (error) {
     console.error(error.message);

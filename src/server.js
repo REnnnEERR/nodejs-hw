@@ -1,14 +1,14 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
+// import helmet from 'helmet';
 import 'dotenv/config';
 import pino from 'pino-http';
-import { conectMongoDB } from './db/connectMongoDB.js';
+import { connectMongoDB } from './db/connectMongoDB.js';
 
-import { noteFoundHandler } from './middleware/notFoundHandler.js';
+import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
-import notesRouters from './routes/notesRoutes.js'
-import { logger } from './middleware/logger.js';
+import notesRouter from './routes/notesRoutes.js';
+// import { logger } from './middleware/logger.js';
 const app = express();
 const PORT = process.env.PORT ?? 3000;
 
@@ -18,7 +18,7 @@ app.use(cors(
   { methods: ['GET', 'POST', 'PUT', 'DELETE'] },
 
 ));
-app.use(helmet());
+// app.use(helmet());
 app.use(
   pino({
     level: 'info',
@@ -36,12 +36,12 @@ app.use(
 );
 
 
-app.use(notesRouters);
+app.use(notesRouter);
 
-app.use(noteFoundHandler);
+app.use(notFoundHandler);
 app.use(errorHandler);
 
-await conectMongoDB();
+await connectMongoDB();
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
