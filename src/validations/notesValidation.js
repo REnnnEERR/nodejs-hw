@@ -35,13 +35,13 @@ export const createNoteSchema = {
 };
 
 
-export const updateStudentSchema = {
+export const updateNoteSchema = {
   [Segments.BODY]: Joi.object({
     title: Joi.string().min(1),
     content: Joi.string().allow(""),
     tag: Joi.string().valid(...TAGS),
   }).min(1),
   [Segments.PARAMS]: Joi.object({
-    studentId: Joi.string().custom(objectIdValidator).required(),
+    noteId: Joi.string().custom(objectIdValidator).required(),
   }),
 };
