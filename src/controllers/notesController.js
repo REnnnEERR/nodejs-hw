@@ -2,7 +2,7 @@ import { Note } from '../models/note.js';
 import createHttpError from 'http-errors';
 
 
-export const getNotes = async (req, res) => {
+export const getAllNotes = async (req, res) => {
   const {
     page = 1,
     perPage = 10,
@@ -45,11 +45,11 @@ export const getNotes = async (req, res) => {
   });
 };
 
-export const getAllNotes = async (req, res) => {
-  // res.status(200).json({ message: "Retrieved all notes" });
-  const notes = await Note.find();
-  res.status(200).json(notes);
-};
+// export const getAllNotes = async (req, res) => {
+//   // res.status(200).json({ message: "Retrieved all notes" });
+//   const notes = await Note.find();
+//   res.status(200).json(notes);
+// };
 
 export const getNoteById = async (req, res) => {
   const { noteId } = req.params;
