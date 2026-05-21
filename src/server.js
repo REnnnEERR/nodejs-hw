@@ -1,4 +1,4 @@
-console.log("Перевірка URI бази даних:", process.env.MONGODB_URI);
+console.log("Перевірка URI бази даних:", process.env.MONGO_URI);
 import express from 'express';
 import cors from 'cors';
 // import helmet from 'helmet';
