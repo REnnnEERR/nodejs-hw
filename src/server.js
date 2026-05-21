@@ -1,3 +1,4 @@
+console.log("Перевірка URI бази даних:", process.env.MONGODB_URI);
 import express from 'express';
 import cors from 'cors';
 // import helmet from 'helmet';
@@ -28,6 +29,7 @@ app.use(notFoundHandler);
 
 app.use(errors());
 app.use(errorHandler);
+
 
 await connectMongoDB();
 
