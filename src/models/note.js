@@ -2,6 +2,12 @@ import { Schema, model } from "mongoose";
 import { TAGS } from "../constants/tags.js";
 
 const noteSchema = new Schema({
+
+  userId: {
+    type: Schema.Types.ObjectId,
+    required: true,
+    ref: "User",
+  },
   title: {
     type: String,
     trim: true,

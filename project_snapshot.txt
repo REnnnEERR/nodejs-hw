@@ -1,9 +1,65 @@
-=== package.json ===
+=== STRUCTURE ===
+.
+./eslint.config.js
+./package-lock.json
+./package.json
+./project_snapshot.txt
+./src
+./src/constants
+./src/constants/tags.js
+./src/constants/time.js
+./src/controllers
+./src/controllers/authController.js
+./src/controllers/notesController.js
+./src/db
+./src/db/connectMongoDB.js
+./src/index.js
+./src/middleware
+./src/middleware/authenticate.js
+./src/middleware/errorHandler.js
+./src/middleware/logger.js
+./src/middleware/notFoundHandler.js
+./src/models
+./src/models/note.js
+./src/models/session.js
+./src/models/user.js
+./src/routes
+./src/routes/authRoutes.js
+./src/routes/notesRoutes.js
+./src/server.js
+./src/services
+./src/services/auth.js
+./src/validations
+./src/validations/authValidation.js
+./src/validations/notesValidation.js
+
+=== FILE CONTENTS ===
+
+--- FILE: ./eslint.config.js ---
+import js from "@eslint/js";
+import globals from "globals";
+import { defineConfig } from "eslint/config";
+
+export default defineConfig([
+  {
+    files: ["**/*.{js,mjs,cjs}"],
+    plugins: { js },
+    extends: ["js/recommended"],
+    languageOptions: { globals: globals.node },
+    rules: {
+      semi: "error",
+      "no-unused-vars": ["error", { args: "none" }],
+      "no-undef": "error",
+    },
+  },
+]);
+
+--- FILE: ./package.json ---
 {
   "name": "nodejs-hw",
   "version": "1.0.0",
   "description": "",
-  "main": "src/index.js",
+  "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
@@ -22,7 +78,9 @@
   },
   "homepage": "https://github.com/REnnnEERR/nodejs-hw#readme",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "celebrate": "^15.0.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -41,5 +99,614 @@
   }
 }
 
+--- FILE: ./src/constants/tags.js ---
+export const TAGS = [
+  'Work',
+  'Personal',
+  'Meeting',
+  'Shopping',
+  'Ideas',
+  'Travel',
+  'Finance',
+  'Health',
+  'Important',
+  'Todo'
+];
 
-=== .env.example ===
+--- FILE: ./src/constants/time.js ---
+export const FIFTEEN_MINUTES = 15 * 60 * 1000;
+export const ONE_DAY = 24 * 60 * 60 * 1000;
+
+
+
+--- FILE: ./src/controllers/authController.js ---
+import createHttpError from 'http-errors';
+import { User } from '../models/user.js';
+import bcrypt from 'bcrypt';
+import {
+  createSession,
+  setSessionCookies,
+} from '../services/auth.js';
+import { HTTPErro } from 'http-custom-errors';
+
+export const registerUser = async (req, res) => {
+  const existingUser = await User.findOne({ email: req.body.email });
+  if (existingUser) {
+    throw createHttpError(400, 'Email in use');
+  };
+
+  const hashPassword = await bcrypt.hash(req.body.password, 10);
+
+
+  const newUser = await User.create({
+    email: req.body.email,
+    password: hashPassword,
+  });
+  res.status(201).json();
+  const session = await createSession(newUser._id);
+  setSessionCookies(res, session);
+  res.status(201).json(newUser);
+};
+
+
+export const loginUser = async (req, res) => {
+  const user = await User.findOne({ email: req.body.email });
+  if (!user) {
+    throw createHttpError(401, 'Invalid credentials');
+  };
+
+  const isValidPassword = await bcrypt.compare(req.body.password, user.password);
+  if (!isValidPassword) {
+    throw createHttpError(401, 'Invalid credentials');
+  };
+
+  await Session.deleteOne({ userId: user._id });
+
+  const session = await createSession(user._id);
+  setSessionCookies(res, session);
+
+  res.status(200).json(user);
+};
+
+export const logoutUser = async (req, res) => {
+  if (req.cookies.sessionId) {
+    await Session.deleteOne({ _id: req.cookies.sessionId });
+  };
+
+  res.clearCookie('accessToken');
+  res.clearCookie('refreshToken');
+  res.clearCookie('sessionId');
+
+  res.status(204).send();
+};
+
+export const refreshSession = async (req, res) => {
+  const { sessionId, refreshToken } = req.cookies;
+
+  if (!sessionId || !refreshToken) {
+    throw createHttpError(401, "No session");
+  };
+
+  const session = await Session.findOne(sessionId) {
+    _id: sessionId,
+    refreshToken,
+  };
+
+  if (!session) {
+    throw createHttpError(401, "Invalid session");
+  };
+
+  const isRefreshTokenValid = session.refreshTokenValidUntil > new Date();
+  if (!isRefreshTokenExpired) {
+    await Session.deleteOne();
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    res.clearCookie("sessionId");
+
+    throw createHttpError(401, "Invalid session");
+  }
+
+  await Session.deleteOne({ _id: sessionId });
+  const newSession = await createSession(session.userId);
+  set.SessionCookies(res, session);
+
+  res.status(200).json({
+    seession: "Sessoin updated!",
+  });
+};
+
+--- FILE: ./src/controllers/notesController.js ---
+import { Note } from '../models/note.js';
+import createHttpError from 'http-errors';
+
+
+export const getAllNotes = async (req, res) => {
+  const {
+    page = 1,
+    perPage = 10,
+    tag,
+    search,
+  } = req.query;
+
+  const skip = (page - 1) * perPage;
+  const limit = perPage;
+
+  const notesQuery = Note.find({
+    userId: req.user._id,
+  });
+
+  if (tag) {
+    notesQuery.where("tag").equals(tag);
+  }
+
+  if (search) {
+    notesQuery.where({
+      $text: {
+        $search: search,
+      },
+    });
+  }
+
+  const [totalNotes, notes] = await Promise.all([
+    notesQuery.clone().countDocuments(),
+    notesQuery.skip(skip).limit(limit),
+  ]);
+
+  const totalPages = Math.ceil(
+    totalNotes / limit
+  );
+
+  res.status(200).json({
+    page: Number(page),
+    perPage: Number(perPage),
+    totalNotes,
+    totalPages,
+    notes,
+  });
+};
+
+// export const getAllNotes = async (req, res) => {
+//   // res.status(200).json({ message: "Retrieved all notes" });
+//   const notes = await Note.find();
+//   res.status(200).json(notes);
+// };
+
+export const getNoteById = async (req, res) => {
+  const { noteId } = req.params;
+  const note = await Note.findOne({
+    _id: noteId,
+    userId: req.user._id,
+  });
+
+  if (!note) {
+    // return res.status(404).json({ message: `Note with ID: ${noteId} not found` });
+
+    throw createHttpError(404, `Note not found`);
+  }
+
+  res.status(200).json(note);
+
+};
+
+export const createNote = async (req, res) => {
+  const newNote = await Note.create({
+    ...req.body,
+    userId: req.user._id,
+  });
+  res.status(201).json(newNote);
+};
+export const deleteNote = async (req, res) => {
+  const { noteId } = req.params;
+  const note = await Note.findOneAndDelete({
+    _id: noteId,
+    userId: req.user._id
+  });
+  if (!note) {
+    throw createHttpError(404, `Note not found`);
+  }
+  res.status(200).json(note);
+};
+export const updateNote = async (req, res) => {
+  const { noteId } = req.params;
+  const note = await Note.findOneAndUpdate({
+    _id: noteId,
+    userId: req.user._id,
+
+  }, req.body,
+    { returnDocument: 'after' });
+
+  if (!note) {
+    throw createHttpError(404, `Note not found`);
+  };
+  res.status(200).json(note);
+};
+
+--- FILE: ./src/db/connectMongoDB.js ---
+import mongoose from 'mongoose';
+
+export async function connectMongoDB() {
+  try {
+    const MongoUrl = process.env.MONGO_URL;
+    await mongoose.connect(MongoUrl);
+    console.log(' ✅ MongoDB connection established successfully');
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+}
+
+--- FILE: ./src/index.js ---
+
+--- FILE: ./src/middleware/authenticate.js ---
+import createHttpError from 'http-errors';
+import { Session } from '../models/session.js';
+import { User } from '../models/user.js';
+
+export const authenticate = async (req, res, next) => {
+  const { sessionId, accessToken, } = req.cookies;
+
+  if (!sessionId || !accessToken) {
+    throw createHttpError(401, "Missing access token");
+  };
+
+  const session = await Session.findOne({
+    _id: sessionId,
+    accessToken,
+
+  });
+
+  if (!session) {
+    throw createHttpError(401, "Session not found");
+  };
+
+  const isAccessTokenExpired = session.accessTokenValidUntil > new Date();
+  if (!isAccessTokenExpired) {
+    throw createHttpError(401, "Access token expired");
+  };
+
+  const user = await User.findById(session.userId);
+  if (!user) {
+    throw createHttpError(401, "No User");
+  }
+
+  req.user = user;
+
+  next();
+};
+
+--- FILE: ./src/middleware/errorHandler.js ---
+import { HttpError, } from "http-errors";
+
+export const errorHandler = (err, req, res, next) => {
+
+
+  if (err instanceof HttpError) {
+    return res.status(err.status).json({
+      message: err.message || err.name
+    });
+  };
+  res.status(500).json({
+    message: 'Something went wrong',
+  });
+
+};
+
+--- FILE: ./src/middleware/logger.js ---
+import pino from 'pino-http';
+
+export const logger = pino({
+  level: 'info',
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'HH:MM:ss',
+      ignore: 'pid,hostname',
+      messageFormat: '{req.method} {req.url} {res.statusCode} - {responseTime}ms',
+      hideObject: true,
+    },
+  },
+});
+
+--- FILE: ./src/middleware/notFoundHandler.js ---
+export const notFoundHandler = (req, res) => {
+  res.status(404).json({ message: "Route not found" });
+};
+
+--- FILE: ./src/models/note.js ---
+import { Schema, model } from "mongoose";
+import { TAGS } from "../constants/tags.js";
+
+const noteSchema = new Schema({
+
+  userId: {
+    type: Schema.Types.ObjectId,
+    required: true,
+    ref: "User",
+  },
+  title: {
+    type: String,
+    trim: true,
+    required: true,
+
+  },
+  content: {
+    type: String,
+    trim: true,
+    default: "",
+  },
+  tag: {
+    type: String,
+    required: false,
+    enum: [...TAGS],
+    default: "Todo",
+  }
+
+}, {
+  timestamps: true,
+});
+
+noteSchema.index({ tag: 1 });
+export const Note = model("Note", noteSchema);
+
+--- FILE: ./src/models/session.js ---
+import { Schema, model } from "mongoose";
+
+const sessionSchema = new Schema({
+  userId: {
+    type: Schema.Types.ObjectId,
+    required: true,
+  },
+  accessToken: {
+    type: String,
+    required: true,
+  },
+  refreshToken: {
+    type: String,
+    required: true,
+  },
+
+  accessTokenValidUntil: {
+    type: Date,
+    required: true,
+  },
+
+  refreshTokenValidUntil: {
+    type: Date,
+    required: true,
+  },
+}, { timestamps: true });
+
+
+export const Session = model("Session", sessionSchema);
+
+--- FILE: ./src/models/user.js ---
+import { Schema, model } from "mongoose";
+
+const userSchema = new Schema({
+  username: {
+    type: String,
+    trim: true,
+  },
+  email: {
+    type: String,
+    trim: true,
+    unique: true,
+    required: true,
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 8,
+  },
+}, { timestamps: true });
+
+userSchema.pre("save", async function () {
+  if (!this.username) {
+    this.username = this.email;
+  }
+});
+
+userSchema.methods.toJSON = function () {
+  const Obj = this.toObject();
+  delete Obj.password;
+  return Obj;
+};
+
+export const User = model("User", userSchema);
+
+--- FILE: ./src/routes/authRoutes.js ---
+import { Router } from "express";
+import { celebrate } from "celebrate";
+import {
+  loginUserSchema,
+  regsiterUserSchema,
+} from "../validations/authValidation.js";
+import {
+  loginUser,
+  logoutUser,
+  refreshSession,
+  registerUser
+} from "../controllers/authController.js";
+
+const router = Router();
+
+router.post("/auth/register", celebrate(regsiterUserSchema), registerUser);
+router.post("/auth/login", celebrate(loginUserSchema), loginUser);
+router.post("/auth/logout", logoutUser);
+router.post("/auth/refresh", refreshSession);
+export default router;
+
+--- FILE: ./src/routes/notesRoutes.js ---
+import { Router } from "express";
+
+import {
+  getAllNotes,
+  getNoteById,
+  createNote,
+  deleteNote,
+  updateNote
+} from "../controllers/notesController.js";
+import { celebrate } from "celebrate";
+import { getAllNotesSchema, noteIdSchema, createNoteSchema, updateNoteSchema } from "../validations/notesValidation.js";
+import { authenticate } from "../middleware/authenticate.js";
+const router = Router();
+
+router.use('/notes', authenticate);
+router.get('/notes', celebrate(getAllNotesSchema), getAllNotes);
+router.get('/notes/:noteId', celebrate(noteIdSchema), getNoteById);
+router.post('/notes', celebrate(createNoteSchema), createNote);
+router.delete('/notes/:noteId', celebrate(noteIdSchema), deleteNote);
+router.patch('/notes/:noteId', celebrate(updateNoteSchema), updateNote);
+
+export default router;
+
+
+--- FILE: ./src/server.js ---
+
+import express from 'express';
+import cors from 'cors';
+// import helmet from 'helmet';
+import 'dotenv/config';
+import { connectMongoDB } from './db/connectMongoDB.js';
+import { errors } from 'celebrate';
+import { notFoundHandler } from './middleware/notFoundHandler.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import notesRouter from './routes/notesRoutes.js';
+import { logger } from './middleware/logger.js';
+import cookieParser from 'cookie-parser';
+
+const app = express();
+const PORT = process.env.PORT ?? 3000;
+
+
+app.use(express.json());
+app.use(cors(
+  { methods: ['GET', 'POST', 'PUT', 'DELETE'] },
+
+));
+// app.use(helmet());
+app.use(logger);
+
+app.use(cookieParser());
+
+app.use(notesRouter);
+
+app.use(notFoundHandler);
+
+app.use(errors());
+app.use(errorHandler);
+
+
+await connectMongoDB();
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+--- FILE: ./src/services/auth.js ---
+import { Session } from "../models/session.js";
+import crypto from "crypto";
+
+import { FIFTEEN_MINUTES, ONE_DAY } from "../constants/time.js";
+
+
+export const createSession = async (id) => {
+  return Session.create({
+    userId: id,
+    accessToken: crypto.randomUUID(),
+    refreshToken: crypto.randomUUID(),
+    accessTokenValidUntil: new Date(Date.now() + FIFTEEN_MINUTES),
+    refreshTokenValidUntil: new Date(Date.now() + ONE_DAY),
+
+  });
+};
+
+export const setSessionCookies = (res, session) => {
+  res.cookie("accessToken", session.accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: FIFTEEN_MINUTES,
+  });
+
+  res.cookie("refreshToken", session.refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: ONE_DAY,
+  });
+
+  res.cookie("sessionId", session.id, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: ONE_DAY,
+  });
+};
+
+--- FILE: ./src/validations/authValidation.js ---
+import { Segments, Joi } from "celebrate";
+
+export const registerUserSchema = {
+  [Segments.BODY]: Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().min(8).required(),
+  }),
+};
+
+export const loginUserSchema = {
+  [Segments.BODY]: Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().required(),
+  }),
+};
+
+--- FILE: ./src/validations/notesValidation.js ---
+import { Joi, Segments } from "celebrate";
+import { TAGS } from "../constants/tags.js";
+import { isValidObjectId } from "mongoose";
+
+
+const objectIdValidator = (value, helpers) => {
+  if (isValidObjectId(value)) {
+    return value;
+  }
+  return helpers.message("invalid note id");
+};
+
+export const getAllNotesSchema = {
+  [Segments.QUERY]: Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    perPage: Joi.number().integer().min(5).max(20).default(10),
+    tag: Joi.string().valid(...TAGS),
+    search: Joi.string().trim().allow(""),
+  }),
+};
+
+export const noteIdSchema = {
+  [Segments.PARAMS]: Joi.object({
+    noteId: Joi.string().custom(objectIdValidator).required(),
+
+  }),
+};
+
+export const createNoteSchema = {
+  [Segments.BODY]: Joi.object({
+    title: Joi.string().min(1).required(),
+    content: Joi.string().allow(""),
+    tag: Joi.string().valid(...TAGS),
+  }),
+};
+
+
+export const updateNoteSchema = {
+  [Segments.BODY]: Joi.object({
+    title: Joi.string().min(1),
+    content: Joi.string().allow(""),
+    tag: Joi.string().valid(...TAGS),
+  }).min(1),
+  [Segments.PARAMS]: Joi.object({
+    noteId: Joi.string().custom(objectIdValidator).required(),
+  }),
+};
