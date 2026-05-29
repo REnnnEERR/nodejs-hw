@@ -5,7 +5,7 @@ import {
   createSession,
   setSessionCookies,
 } from '../services/auth.js';
-import { HTTPErro } from 'http-custom-errors';
+import { Session } from '../models/session.js';
 
 export const registerUser = async (req, res) => {
   const existingUser = await User.findOne({ email: req.body.email });
@@ -22,6 +22,7 @@ export const registerUser = async (req, res) => {
   });
   const session = await createSession(newUser._id);
   setSessionCookies(res, session);
+
   res.status(201).json(newUser);
 };
 
@@ -32,7 +33,10 @@ export const loginUser = async (req, res) => {
     throw createHttpError(401, 'Invalid credentials');
   };
 
-  const isValidPassword = await bcrypt.compare(req.body.password, user.password);
+  const isValidPassword = await bcrypt.compare(
+    req.body.password,
+    user.password
+  );
   if (!isValidPassword) {
     throw createHttpError(401, 'Invalid credentials');
   };
@@ -64,16 +68,16 @@ export const refreshUserSession = async (req, res) => {
     throw createHttpError(401, "No session");
   };
 
-  const session = await Session.findOne(sessionId) {
+  const session = await Session.findOne({
     _id: sessionId,
     refreshToken,
-  };
+  });
 
   if (!session) {
     throw createHttpError(401, "Invalid session");
   };
 
-  const isRefreshTokenValid = session.refreshTokenValidUntil > new Date();
+  const isRefreshTokenExpired = session.refreshTokenValidUntil > new Date();
   if (!isRefreshTokenExpired) {
     await Session.deleteOne();
     res.clearCookie("accessToken");
@@ -85,7 +89,7 @@ export const refreshUserSession = async (req, res) => {
 
   await Session.deleteOne({ _id: sessionId });
   const newSession = await createSession(session.userId);
-  set.SessionCookies(res, session);
+  setSessionCookies(res, newSession);
 
   res.status(200).json({
     seession: "Sessoin updated!",
