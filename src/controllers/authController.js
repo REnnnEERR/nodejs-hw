@@ -20,7 +20,6 @@ export const registerUser = async (req, res) => {
     email: req.body.email,
     password: hashPassword,
   });
-  res.status(201).json();
   const session = await createSession(newUser._id);
   setSessionCookies(res, session);
   res.status(201).json(newUser);
@@ -58,7 +57,7 @@ export const logoutUser = async (req, res) => {
   res.status(204).send();
 };
 
-export const refreshSession = async (req, res) => {
+export const refreshUserSession = async (req, res) => {
   const { sessionId, refreshToken } = req.cookies;
 
   if (!sessionId || !refreshToken) {
