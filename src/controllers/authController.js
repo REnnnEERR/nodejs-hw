@@ -1,11 +1,13 @@
 import createHttpError from 'http-errors';
 import { User } from '../models/user.js';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import {
   createSession,
   setSessionCookies,
 } from '../services/auth.js';
 import { Session } from '../models/session.js';
+import { sendEmail } from "../utils/sendMail.js";
 
 export const registerUser = async (req, res) => {
   const existingUser = await User.findOne({ email: req.body.email });
@@ -93,5 +95,73 @@ export const refreshUserSession = async (req, res) => {
 
   res.status(200).json({
     seession: "Sessoin updated!",
+  });
+};
+
+
+export const requestResetEmail = async (req, res) => {
+  const user = await User.findOne({ email: req.body.email });
+  if (!user) {
+    return res.status(200).json({
+      message: 'Password reset email sent successfully'
+    });
+  };
+  const resetToken = jwt.sign({
+    email: user.email,
+    sub: user._id,
+  }, process.env.JWT_SECRET, { expiresIn: '10m' });
+
+  const frontEndUrl = `${process.env.FRONTEND_URL}?token=${resetToken}`;
+  console.log(resetToken);
+
+  try {
+    await sendEmail({
+      from: process.env.SMTP_FROM,
+      to: req.body.email,
+      subject: 'Click <a href="${frontEndUrl}">here</a> to reset your password',
+    });
+  } catch (error) {
+    throw createHttpError(500, error);
+  };
+
+  res.status(200).json({
+    message: "Password reset email sent successfully"
+  });
+};
+
+export const resetPassword = async (req, res) => {
+
+  let payload;
+  try {
+    payload = jwt.verify(
+      req.body.token,
+      process.env.JWT_SECRET
+    );
+  }
+  catch {
+    throw createHttpError(401, "Invalid or expired token");
+  };
+
+  const user = await User.findOne({
+    _id: payload.sub,
+    email: payload.email,
+  });
+
+  if (!user) {
+    throw createHttpError(404, "No User");
+  };
+
+  const hashPassword = await bcrypt.hash(req.body.password, 10);
+  await User.updateOne({
+    _id: user._id
+  },
+    {
+      password: hashPassword
+    });
+
+
+  await Session.deleteMany({ userId: user._id });
+  res.status(200).json({
+    message: "Success"
   });
 };
