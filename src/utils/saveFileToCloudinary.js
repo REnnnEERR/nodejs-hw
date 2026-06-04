@@ -10,7 +10,7 @@ cloudinary.config({
 export const saveFileToCloudinary = async (buffer, userId) => {
   const options = {
     folder: "Notes-app/avatars",
-    public_id: "avatar_${userId}",
+    public_id: `avatar_${userId}`,
     resource_type: "image",
     overwrite: true,
     transformation: [
